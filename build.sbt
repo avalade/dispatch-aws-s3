@@ -4,6 +4,8 @@ organization := "net.databinder"
 
 version := "0.1.2"
 
+scalaVersion := "2.10.0"
+
 crossScalaVersions := Seq("2.9.1", "2.9.2", "2.10.0")
 
 libraryDependencies <++= scalaVersion { sv => Seq(

@@ -1,8 +1,8 @@
-package dispatch.s3
+package dispatch.classic.s3
 
 import java.net.URLEncoder._
 import java.lang.Long
-import dispatch._
+import dispatch.classic._
 
 object S3 {
   import javax.crypto

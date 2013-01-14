@@ -1,6 +1,6 @@
 import java.util.{TimeZone, Calendar}
 import org.specs._
-import dispatch._
+import dispatch.classic._
 import s3._
 import S3._
 import java.io.{File,FileWriter}
@@ -13,7 +13,16 @@ object S3Spec extends Specification {
   val test = Bucket(bucketName)
   val access_key = getValue("awsAccessKey")
   val secret_key = getValue("awsSecretAccessKey")
-
+  val http = new Http {
+    override def make_logger = new Logger {
+      def info(msg: String, items: Any*) {
+        // Don't do anything here
+      }
+      def warn(msg: String, items: Any*) {
+        // Don't do anything here
+      }
+    }
+  }
   def shouldWeSkip_? = List(access_key, secret_key) must notContain(None).orSkip
 
   def newTempFile = {
@@ -28,7 +37,7 @@ object S3Spec extends Specification {
     "be able to create a bucket" in {
       shouldWeSkip_?
       val resp = test.create <@ (access_key.get, secret_key.get)
-      Http x (resp as_str) {
+      http x (resp as_str) {
         case (code, _, _, _) => code must be_==(200)
       }
     }
@@ -38,7 +47,7 @@ object S3Spec extends Specification {
       val testFile = newTempFile
 
       val r = test / "testing.txt" <<< (testFile, "plain/text") <@ (access_key.get, secret_key.get)
-      Http x (r as_str){
+      http x (r as_str){
         case (code, _, _, _) => {
           code must be_==(200)
         }
@@ -49,13 +58,13 @@ object S3Spec extends Specification {
       val testFile = newTempFile
       val headers = Map("x-amz-meta-author" -> "john@doe.com")
       val r = test / "testing.txt" <<< (testFile, "plain/text") <:< headers <@ (access_key.get, secret_key.get)
-      Http x (r as_str) {
+      http x (r as_str) {
         case (code, _, _, _) => code must be_== (200)
       }
     }
     "be able to retrieve a file" in {
       shouldWeSkip_?
-      Http x(test / "testing.txt" <@ (access_key.get, secret_key.get) as_str) {
+      http x(test / "testing.txt" <@ (access_key.get, secret_key.get) as_str) {
         case (code, _, _, str) => {
           code must be_==(200)
           str() must be_==("testing")
@@ -64,7 +73,7 @@ object S3Spec extends Specification {
     }
     "be able to delete a file" in {
       shouldWeSkip_?
-      Http x (test.DELETE / "testing.txt" <@ (access_key.get, secret_key.get) >|) {
+      http x (test.DELETE / "testing.txt" <@ (access_key.get, secret_key.get) >|) {
         case (code, _, _, _) => code must be_==(204)
       }
     }
@@ -93,7 +102,7 @@ object S3Spec extends Specification {
       val req = ((test / "testfile123.txt") <:< amzHeaders).PUT.signed(
         access_key.get, secret_key.get, expires, Some("text/plain"), Some(contentMd5))
       req.to_uri.toString must startWith ("https://s3.amazonaws.com/databinder-dispatch-s3-test-bucket/testfile123.txt")
-      Http x (req <<< (testFile, "text/plain")) >| {
+      http x (req <<< (testFile, "text/plain")) >| {
         case (code, _, _, _) => {
           code must be_== (200)
         }
@@ -104,7 +113,7 @@ object S3Spec extends Specification {
       val expires = System.currentTimeMillis() / 1000 + 30
       val req = (test / "testfile123.txt").signed(access_key.get, secret_key.get, expires)
       req.to_uri.toString must startWith ("https://s3.amazonaws.com/databinder-dispatch-s3-test-bucket/testfile123.txt")
-      Http x(req as_str) {
+      http x(req as_str) {
         case (code, _, _, str) => {
           code must be_==(200)
           str() must be_==("testing")
@@ -115,7 +124,7 @@ object S3Spec extends Specification {
       shouldWeSkip_?
       val expires = System.currentTimeMillis() / 1000 + 30
       val req = (test / "testfile123.txt").DELETE signed (access_key.get, secret_key.get, expires)
-      Http x req >| {
+      http x req >| {
         case (code, _, _, _) => {
           code must be_== (204)
         }
@@ -123,7 +132,7 @@ object S3Spec extends Specification {
     }
     "be able to delete a bucket" in {
       shouldWeSkip_?
-      Http x (test.DELETE <@ (access_key.get, secret_key.get) >| ) {
+      http x (test.DELETE <@ (access_key.get, secret_key.get) >| ) {
         case (code, _, _, _) => code must be_==(204)
       }
     }
@@ -131,7 +140,7 @@ object S3Spec extends Specification {
   }
 
   doAfterSpec {
-    Http.shutdown()
+    http.shutdown()
   }
 
   def getValue(key: String): Option[String] = {
